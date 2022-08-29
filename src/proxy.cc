@@ -213,9 +213,9 @@ int main(int argc, char *argv[])
     {
     case SOFTMODEM_LTE:
         {
-            Multi_UE_Proxy lte_proxy(ues, enb_ipaddr, proxy_ipaddr, ue_ipaddr);
+            Multi_UE_Proxy lte_proxy(ues, enb_ipaddr, proxy_ipaddr, ue_ipaddr); //NOTE Runs config...
             if (NULL != ss_cfg_g) ss_cfg_g->softmodem_mode= SOFTMODEM_LTE;
-            lte_proxy.start(softmodem_mode);
+            lte_proxy.start(softmodem_mode); //NOTE runs the main part
         }
         break;
     case SOFTMODEM_NR:

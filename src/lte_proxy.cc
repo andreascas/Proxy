@@ -31,17 +31,19 @@ namespace
 
 Multi_UE_Proxy::Multi_UE_Proxy(int num_of_ues,  std::string enb_ip, std::string proxy_ip, std::string ue_ip)
 {
+    printf("config\n");
     assert(instance == NULL);
     instance = this;
     num_ues = num_of_ues ;
 
     configure(enb_ip, proxy_ip, ue_ip);
-
+//Print different values, are they saved somewhere?
     oai_subframe_init();
 }
 
 void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
 {
+    printf("start\n");
     pthread_t thread;
 
     configure_nfapi_pnf(vnf_ipaddr.c_str(), vnf_p5port, pnf_ipaddr.c_str(), pnf_p7port, vnf_p7port);
@@ -64,6 +66,7 @@ void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
     }
     for (auto &th : threads)
     {
+
         if(th.joinable())
         {
             th.join();
@@ -73,68 +76,111 @@ void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
 
 void Multi_UE_Proxy::configure(std::string enb_ip, std::string proxy_ip, std::string ue_ip)
 {
-    oai_ue_ipaddr = ue_ip;
+    //for (i = 0; i< sizeof(ue_ip); i++){
+    //    printf("%d : %s \n", i, ue_ip[])
+    //}
+
+    oai_ue_ipaddr =  "172.18.0.3";//"127.0.0.1"; //ue_ip;
+    std::string oai_ue_ipaddr2 = "172.18.0.2"; //ue_ip2;
+    std::string oai_ue_ipaddr3 = "172.18.0.4"; //ue_ip2;
     vnf_ipaddr = enb_ip;
     pnf_ipaddr = proxy_ip;
     vnf_p5port = 50001;
     vnf_p7port = 50011;
     pnf_p7port = 50010;
+    std::string ues[3] = {oai_ue_ipaddr, oai_ue_ipaddr3, oai_ue_ipaddr2};
+    //std::string ues[2] = {oai_ue_ipaddr2, oai_ue_ipaddr2};
+    //std::string ues[2] = {oai_ue_ipaddr, oai_ue_ipaddr};
+
 
     std::cout<<"VNF is on IP Address "<<vnf_ipaddr<<std::endl;
     std::cout<<"PNF is on IP Address "<<pnf_ipaddr<<std::endl;
     std::cout<<"OAI-UE is on IP Address "<<oai_ue_ipaddr<<std::endl;
+    std::cout<<"OAI-UE2 is on IP Address "<<oai_ue_ipaddr2<<std::endl;
 
+    
     for (int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
+        //printf ("test: %d \n Secondtest : %d\n", oai_ue_ipaddr.c_str() == oai_ue_ipaddr2.c_str(), ue_ip.c_str() == ues[ue_idx].c_str() );
+        //printf("%s :  %s : bool %d : test %d \n", ues[ue_idx].c_str() , oai_ue_ipaddr.c_str(), ues[ue_idx].c_str() == oai_ue_ipaddr.c_str() );
+        //printf("%d : %s \n", ue_idx, ues[ue_idx].c_str());
+        //printf("%d \n", ues[ue_idx].c_str()== oai_ue_ipaddr.c_str());
+        printf("%d\n",ue_idx);
         int oai_rx_ue_port = 3211 + ue_idx * port_delta;
         int oai_tx_ue_port = 3212 + ue_idx * port_delta;
-        init_oai_socket(oai_ue_ipaddr.c_str(), oai_tx_ue_port, oai_rx_ue_port, ue_idx);
+        // if (ue_idx == 0){
+        //     results = init_oai_socket(ues[0].c_str(), oai_tx_ue_port, oai_rx_ue_port, ue_idx);
+        //     printf("first \n");
+        // }
+        // else{
+        //     printf("second\n");
+        //     results = init_oai_socket(ues[1].c_str(), oai_tx_ue_port, oai_rx_ue_port, ue_idx);
+            
+        // }
+        printf("starting for %s\n", ues[ue_idx].c_str());
+        int result = init_oai_socket(ues[ue_idx].c_str(), oai_tx_ue_port, oai_rx_ue_port, ue_idx);
+        if (result == -1)
+            printf("failed rx\n");
     }
+
+    // for (int ue_idx = 0; ue_idx < num_ues; ue_idx++)
+    // {
+    //     int oai_rx_ue_port = 3211; //+ ue_idx * port_delta;
+    //     int oai_tx_ue_port = 3212; //+ ue_idx * port_delta;
+    //     init_oai_socket(oai_ue_ipaddr.c_str(), oai_tx_ue_port, oai_rx_ue_port, ue_idx);
+    // }
 }
 
 int Multi_UE_Proxy::init_oai_socket(const char *addr, int tx_port, int rx_port, int ue_idx)
 {
     {   //Setup Rx Socket
-        memset(&address_rx_, 0, sizeof(address_rx_));
-        address_rx_.sin_family = AF_INET;
-        address_rx_.sin_addr.s_addr = INADDR_ANY;
-        address_rx_.sin_port = htons(rx_port);
+        //printf("Rxstart\n");
+        memset(&address_rx_[ue_idx], 0, sizeof(address_rx_[ue_idx]));
+        address_rx_[ue_idx].sin_family = AF_INET;
+        address_rx_[ue_idx].sin_addr.s_addr = INADDR_ANY;
+        address_rx_[ue_idx].sin_port = htons(rx_port);
 
-        ue_rx_socket_ = socket(address_rx_.sin_family, SOCK_DGRAM, 0);
+        ue_rx_socket_ = socket(address_rx_[ue_idx].sin_family, SOCK_DGRAM, 0);
+        //printf("rxsocket %d\n", ue_rx_socket_);
         ue_rx_socket[ue_idx] = ue_rx_socket_;
         if (ue_rx_socket_ < 0)
         {
             NFAPI_TRACE(NFAPI_TRACE_ERROR, "socket: %s", ERR);
             return -1;
         }
-        if (bind(ue_rx_socket_, (struct sockaddr *)&address_rx_, sizeof(address_rx_)) < 0)
+        if (bind(ue_rx_socket_, (struct sockaddr *)&address_rx_[ue_idx], sizeof(address_rx_[ue_idx])) < 0)
         {
             NFAPI_TRACE(NFAPI_TRACE_ERROR, "bind failed in init_oai_socket: %s\n", strerror(errno));
+            printf("failed rx bind \n");
             close(ue_rx_socket_);
             ue_rx_socket_ = -1;
             return -1;
         }
     }
+    
     {   //Setup Tx Socket
-        memset(&address_tx_, 0, sizeof(address_tx_));
-        address_tx_.sin_family = AF_INET;
-        address_tx_.sin_port = htons(tx_port);
+        //printf("Txstart\n");
+        memset(&address_tx_[ue_idx], 0, sizeof(address_tx_[ue_idx]));
+        address_tx_[ue_idx].sin_family = AF_INET;
+        address_tx_[ue_idx].sin_port = htons(tx_port);
 
-        if (inet_aton(addr, &address_tx_.sin_addr) == 0)
+        if (inet_aton(addr, &address_tx_[ue_idx].sin_addr) == 0)
         {
             NFAPI_TRACE(NFAPI_TRACE_ERROR, "addr no good %s", addr);
             return -1;
         }
 
-        ue_tx_socket_ = socket(address_tx_.sin_family, SOCK_DGRAM, 0);
+        ue_tx_socket_ = socket(address_tx_[ue_idx].sin_family, SOCK_DGRAM, 0);
         ue_tx_socket[ue_idx] = ue_tx_socket_;
+        //printf("txsocket %d\n", ue_tx_socket_);
+
         if (ue_tx_socket_ < 0)
         {
             NFAPI_TRACE(NFAPI_TRACE_ERROR, "socket: %s", ERR);
             return -1;
         }
 
-        if (connect(ue_tx_socket_, (struct sockaddr *)&address_tx_, sizeof(address_tx_)) < 0)
+        if (connect(ue_tx_socket_, (struct sockaddr *)&address_tx_[ue_idx], sizeof(address_tx_[ue_idx])) < 0)
         {
           NFAPI_TRACE(NFAPI_TRACE_ERROR, "tx connection failed in init_oai_socket: %s\n", strerror(errno));
           close(ue_tx_socket_);
@@ -146,15 +192,25 @@ int Multi_UE_Proxy::init_oai_socket(const char *addr, int tx_port, int rx_port, 
 
 void Multi_UE_Proxy::receive_message_from_ue(int ue_idx)
 {
+    //printf("thread %d\n",ue_idx);
     char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
-    socklen_t addr_len = sizeof(address_rx_);
-
+    socklen_t addr_len = sizeof(address_rx_[ue_idx]);
     while(true)
     {
-        int buflen = recvfrom(ue_rx_socket[ue_idx], buffer, sizeof(buffer), 0, (sockaddr *)&address_rx_, &addr_len);
+        //if(ue_idx !=0){
+        printf("pre id: %d\n", ue_idx);
+            //printf("%d\n",ue_rx_socket[ue_idx]);
+        //}
+
+        int buflen = recvfrom(ue_rx_socket[ue_idx], buffer, sizeof(buffer), 0, (sockaddr *)&address_rx_[ue_idx], &addr_len); // dies here?
+
+        if(ue_idx !=0){
+            printf("post id: %d : %d\n", ue_idx, buflen);
+        }
         if (buflen == -1)
         {
             NFAPI_TRACE(NFAPI_TRACE_ERROR, "Recvfrom failed %s", strerror(errno));
+            printf("failed\n");
             return ;
         }
         if (buflen == 4)
@@ -165,6 +221,7 @@ void Multi_UE_Proxy::receive_message_from_ue(int ue_idx)
         }
         else
         {
+            printf("else\n");
             nfapi_p7_message_header_t header;
             if (nfapi_p7_message_header_unpack(buffer, buflen, &header, sizeof(header), NULL) < 0)
             {
@@ -176,7 +233,9 @@ void Multi_UE_Proxy::receive_message_from_ue(int ue_idx)
                     header.message_id, NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
         }
         oai_subframe_handle_msg_from_ue(buffer, buflen, ue_idx + 2);
+
     }
+
 }
 
 void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(void *msg_org)
@@ -209,7 +268,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(void *msg_org)
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        address_tx_.sin_port = htons(3212 + ue_idx * port_delta);
+        address_tx_[ue_idx].sin_port = htons(3212 + ue_idx * port_delta);
         uint16_t id_=1;
         switch (msg.header.message_id)
         {
@@ -223,7 +282,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(void *msg_org)
                        " Subframe: %d, Number of PDUs: %u",
                        dl_sfn, dl_sf, dl_numPDU);
             assert(ue_tx_socket[ue_idx] > 2);
-            if (sendto(ue_tx_socket[ue_idx], buffer, encoded_size, 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
+            if (sendto(ue_tx_socket[ue_idx], buffer, encoded_size, 0, (const struct sockaddr *) &address_tx_[ue_idx], sizeof(address_tx_[ue_idx])) < 0)
             {
                 NFAPI_TRACE(NFAPI_TRACE_ERROR, "Send NFAPI_DL_CONFIG_REQUEST to OAI UE failed");
             }
@@ -235,7 +294,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(void *msg_org)
         }
         case NFAPI_TX_REQUEST:
             assert(ue_tx_socket[ue_idx] > 2);
-            if (sendto(ue_tx_socket[ue_idx], buffer, encoded_size, 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
+            if (sendto(ue_tx_socket[ue_idx], buffer, encoded_size, 0, (const struct sockaddr *) &address_tx_[ue_idx], sizeof(address_tx_[ue_idx])) < 0)
             {
                 NFAPI_TRACE(NFAPI_TRACE_ERROR, "Send NFAPI_TX_CONFIG_REQUEST to OAI UE failed");
             }
@@ -247,7 +306,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(void *msg_org)
 
         case NFAPI_UL_CONFIG_REQUEST:
             assert(ue_tx_socket[ue_idx] > 2);
-            if (sendto(ue_tx_socket[ue_idx], buffer, encoded_size, 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
+            if (sendto(ue_tx_socket[ue_idx], buffer, encoded_size, 0, (const struct sockaddr *) &address_tx_[ue_idx], sizeof(address_tx_[ue_idx])) < 0)
             {
                 NFAPI_TRACE(NFAPI_TRACE_ERROR, "Send NFAPI_UL_CONFIG_REQUEST to OAI UE failed");
             }
@@ -259,7 +318,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(void *msg_org)
 
         case NFAPI_HI_DCI0_REQUEST:
             assert(ue_tx_socket[ue_idx] > 2);
-            if (sendto(ue_tx_socket[ue_idx], buffer, encoded_size, 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
+            if (sendto(ue_tx_socket[ue_idx], buffer, encoded_size, 0, (const struct sockaddr *) &address_tx_[ue_idx], sizeof(address_tx_[ue_idx])) < 0)
             {
                 NFAPI_TRACE(NFAPI_TRACE_ERROR, "Send NFAPI_HI_DCI0_REQUEST to OAI UE failed");
             }
@@ -270,7 +329,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(void *msg_org)
             break;
         case P7_CELL_SEARCH_IND:
             assert(ue_tx_socket[ue_idx] > 2);
-            if (sendto(ue_tx_socket[ue_idx], buffer, encoded_size, 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
+            if (sendto(ue_tx_socket[ue_idx], buffer, encoded_size, 0, (const struct sockaddr *) &address_tx_[ue_idx], sizeof(address_tx_[ue_idx])) < 0)
             {
                 NFAPI_TRACE(NFAPI_TRACE_ERROR, "Send P7_CELL_SRCH_IND to OAI UE failed");
             }
@@ -294,9 +353,10 @@ void Multi_UE_Proxy::pack_and_send_downlink_sfn_sf_msg(uint16_t sfn_sf)
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        address_tx_.sin_port = htons(3212 + ue_idx * port_delta);
+        address_tx_[ue_idx].sin_port = htons(3212 + ue_idx * port_delta);
+        //printf(" assert error  %d\n", ue_tx_socket[ue_idx]);
         assert(ue_tx_socket[ue_idx] > 2);
-        if (sendto(ue_tx_socket[ue_idx], &sfn_sf, sizeof(sfn_sf), 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
+        if (sendto(ue_tx_socket[ue_idx], &sfn_sf, sizeof(sfn_sf), 0, (const struct sockaddr *) &address_tx_[ue_idx], sizeof(address_tx_[ue_idx])) < 0)
         {
             int sfn = NFAPI_SFNSF2SFN(sfn_sf);
             int sf = NFAPI_SFNSF2SF(sfn_sf);
